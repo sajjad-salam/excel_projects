@@ -49,7 +49,8 @@ Sub MergeExcelFilesToSheets()
             ' Copy each sheet from source to destination workbook
             For Each ws In wbSource.Worksheets
                 ' Create sheet name (max 31 chars, no special characters)
-                sheetName = Left(file.Name, InStrRev(file.Name, ".") - 1) & "_" & ws.Name
+                sheetName = Left(file.Name, InStrRev(file.Name, ".") - 1)
+                ' sheetName = Left(file.Name, InStrRev(file.Name, ".") - 1) & "_" & ws.Name
                 sheetName = Left(sheetName, 31)
                 sheetName = Replace(sheetName, ":", "")
                 sheetName = Replace(sheetName, "\", "")
