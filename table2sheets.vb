@@ -1,119 +1,80 @@
-Sub CreateSheetsForEachElectionCenter_RTL()
-    Dim mainSheet As Worksheet
-    Dim newSheet As Worksheet
-    Dim electionCenters As Object
-    Dim i As Long
-    Dim centerName As Variant
-    Dim filteredRange As Range
-    Dim rngToFilter As Range
+Sub FilterAndCreateSheetsByColumnG()
+    Dim wsMain As Worksheet
+    Dim wsNew As Worksheet
+    Dim lastRow As Long
+    Dim lastCol As Long
+    Dim filterRange As Range
+    Dim uniqueValues As Collection
+    Dim cell As Range
+    Dim value As Variant
+    Dim newSheetName As String
 
-    On Error GoTo ErrorHandler
-
-    ' Turn off screen updating for better performance
+    ' تعطيل تحديث الشاشة لتحسين الأداء
     Application.ScreenUpdating = False
     Application.DisplayAlerts = False
 
-    ' Set the main sheet (assuming the table is on the active sheet)
-    Set mainSheet = ActiveSheet
+    ' تحديد الورقة الرئيسية (الشيت الذي يحتوي على البيانات)
+    Set wsMain = ActiveSheet
 
-    ' Set the range to filter (A1:B5)
-    Set rngToFilter = mainSheet.Range("A1:B5")
+    ' تحديد آخر صف وآخر عمود في الجدول
+    lastRow = wsMain.Cells(wsMain.Rows.Count, "G").End(xlUp).Row
+    lastCol = wsMain.Cells(1, wsMain.Columns.Count).End(xlToLeft).Column
 
-    ' Create dictionary to store unique election centers
-    Set electionCenters = CreateObject("Scripting.Dictionary")
+    ' تحديد النطاق الكامل للبيانات (بما في ذلك العناوين)
+    Set filterRange = wsMain.Range(wsMain.Cells(1, 1), wsMain.Cells(lastRow, lastCol))
 
-    ' Collect all unique election centers from column B (B2 to B5)
-    For i = 2 To 5 ' Assuming row 1 has headers, data is in rows 2-5
-        If Not IsEmpty(mainSheet.Cells(i, 2)) Then
-            centerName = mainSheet.Cells(i, 2).Value ' Column B contains centers
-            If Not electionCenters.Exists(centerName) And centerName <> "" Then
-                electionCenters.Add centerName, 1
-            End If
+    ' جمع القيم الفريدة من العمود G
+    Set uniqueValues = New Collection
+    On Error Resume Next
+    For Each cell In wsMain.Range("G1:G" & lastRow) ' افتراض أن الصف الأول عناوين
+        If Not IsEmpty(cell.Value) Then
+            uniqueValues.Add cell.Value, CStr(cell.Value) ' إضافة القيمة إذا كانت فريدة
         End If
-    Next i
+    Next cell
+    On Error GoTo 0
 
-    ' Exit if no centers found
-    If electionCenters.Count = 0 Then
-        MsgBox "No election centers found in the specified range.", vbExclamation
+    ' التحقق مما إذا كانت هناك قيم فريدة
+    If uniqueValues.Count = 0 Then
+        MsgBox "لم يتم العثور على أي قيم فريدة في العمود G!", vbExclamation
         GoTo CleanUp
     End If
 
-    ' Delete old sheets if they exist (except the main sheet)
-    For Each newSheet In ThisWorkbook.Worksheets
-        If newSheet.Name <> mainSheet.Name And electionCenters.Exists(newSheet.Name) Then
+    ' حذف الأوراق القديمة التي تحمل نفس الأسماء (اختياري)
+    Dim sheet As Worksheet
+    For Each sheet In ThisWorkbook.Worksheets
+        If sheet.Name <> wsMain.Name Then
             Application.DisplayAlerts = False
-            newSheet.Delete
+            sheet.Delete
             Application.DisplayAlerts = True
         End If
-    Next newSheet
+    Next sheet
 
-    ' Create a new sheet for each election center
-    For Each centerName In electionCenters.Keys
-        ' Create new sheet
-        Set newSheet = Worksheets.Add(After:=Worksheets(Worksheets.Count))
+    ' إنشاء أوراق عمل جديدة لكل قيمة فريدة
+    For Each value In uniqueValues
+        ' إنشاء ورقة جديدة
+        Set wsNew = Worksheets.Add(After:=Worksheets(Worksheets.Count))
 
-        ' Set sheet to right-to-left
-        newSheet.DisplayRightToLeft = True
+        ' تعيين اسم الورقة (تجنب الأسماء الطويلة أو غير الصالحة)
+        newSheetName = Left(value, 31)
+        wsNew.Name = newSheetName
 
-        On Error Resume Next
-        newSheet.Name = Left(centerName, 31) ' Ensure sheet name doesn't exceed 31 chars
-        If Err.Number <> 0 Then
-            newSheet.Name = "Center_" & electionCenters.Count
-            Err.Clear
-        End If
-        On Error GoTo 0
+        ' نسخ العناوين إلى الورقة الجديدة
+        filterRange.Rows(1).Copy Destination:=wsNew.Range("A1")
 
-        ' Copy headers from main sheet
-        mainSheet.Range("A1:B1").Copy Destination:=newSheet.Range("A1")
+        ' تصفية البيانات بناءً على القيمة الحالية
+        filterRange.AutoFilter Field:=7, Criteria1:=value ' العمود السابع (G)
+        filterRange.Offset(1, 0).Resize(filterRange.Rows.Count - 1).SpecialCells(xlCellTypeVisible).Copy _
+            Destination:=wsNew.Range("A2")
 
-        ' Filter and copy data for this center
-        With rngToFilter
-            .AutoFilter
-            .AutoFilter Field:=2, Criteria1:=centerName
-
-            ' Check if any visible cells after filtering
-            On Error Resume Next
-            Set filteredRange = .Offset(1, 0).Resize(.Rows.Count - 1).SpecialCells(xlCellTypeVisible)
-            On Error GoTo 0
-
-            If Not filteredRange Is Nothing Then
-                filteredRange.Copy Destination:=newSheet.Range("A2")
-                Set filteredRange = Nothing
-            End If
-
-            .AutoFilter
-        End With
-
-        ' Auto-fit columns to content
-        newSheet.Columns("A:B").AutoFit
-
-        ' Add voter count in cell C1 (right-aligned)
-        ' اضافة عدد الناخبين الى الخلية
-        ' With newSheet.Cells(1, 3)
-        '     .Value = "عدد الناخبين: " & (newSheet.Cells(newSheet.Rows.Count, "A").End(xlUp).Row - 1)
-        '     .HorizontalAlignment = xlRight
-        ' End With
-
-        ' Set entire sheet to right-to-left
-        newSheet.Cells.HorizontalAlignment = xlRight
-    Next centerName
+        ' إزالة التصفية
+        filterRange.AutoFilter
+    Next value
 
 CleanUp:
-    ' Return to main sheet
-    mainSheet.Activate
-
-    ' Restore screen updating
+    ' إعادة تفعيل تحديث الشاشة والإشعارات
     Application.ScreenUpdating = True
     Application.DisplayAlerts = True
 
-    If electionCenters.Count > 0 Then
-        MsgBox "Done  workly by Eng. sajjad " & electionCenters.Count & " this code work good !", vbInformation, "done"
-    End If
-
-    Exit Sub
-
-ErrorHandler:
-    MsgBox "error " & Err.Number & ": " & Err.Description & vbCrLf & _
-           "check data and try again .", vbCritical, "error big problem"
-    Resume CleanUp
+    ' إشعار بالانتهاء
+    MsgBox "تم إنشاء " & uniqueValues.Count & " أوراق جديدة بنجاح!", vbInformation, "عملية ناجحة"
 End Sub
