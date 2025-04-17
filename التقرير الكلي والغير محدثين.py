@@ -41,7 +41,7 @@ def count_voters(input_file):
 
     # Set up headers in Results sheet (start from row 3)
     # change font size to 20
-    results_sheet.append(["اسم الورقة", "عدد التحديث",
+    results_sheet.append(["اسم المسؤول", "عدد التحديث",
                          "عدد تم التحديث", "عدد البطايق"])
     header_fill = PatternFill(start_color="BFBFBF",
                               end_color="BFBFBF", fill_type="solid")
@@ -195,5 +195,5 @@ def count_voters(input_file):
 # تحتاج الى ملف بي شيتات ابو ال10 بداخلة
 # راح يرجعلك نفس الملف بس بداخلة شيت الاحصائية وشيت الغير محدثين
 # Run the function
-input_file = "copied_data.xlsx"
+input_file = "all.xlsx"
 count_voters(input_file)
